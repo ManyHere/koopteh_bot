@@ -1,0 +1,187 @@
+import logging
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+TOKEN = 'your_token'
+
+user_last_messages = {}
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id in user_last_messages:
+        user_last_messages[user_id] = {}
+
+    keyboard = [
+        ["Информация об общежитии", "Информация о техникуме"],
+        ["Официальный канал и сайт", "Помощь"],
+        ["Связь с нами"]
+    ]
+
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    message = await update.message.reply_text("Добро пожаловать! Что вы хотите узнать?", reply_markup=reply_markup)
+
+    if user_id not in user_last_messages:
+        user_last_messages[user_id] = {}
+    user_last_messages[user_id]['menu'] = message.message_id
+
+
+async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    text = update.message.text
+
+    if user_id not in user_last_messages:
+        user_last_messages[user_id] = {}
+
+    try:
+        if text == "Информация об общежитии":
+            keyboard = [
+                [InlineKeyboardButton("Цена общежития", callback_data="price")],
+                [InlineKeyboardButton("Адрес", callback_data="Adres")],
+                [InlineKeyboardButton("Максимальное количество мест", callback_data="Max_mest")],
+                [InlineKeyboardButton("Номер общежития", callback_data="Num_dorm")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if 'dorm_menu' in user_last_messages[user_id]:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id,
+                                                     message_id=user_last_messages[user_id]['dorm_menu'])
+                except:
+                    pass
+
+            message = await update.message.reply_text("Выберите что вас интересует", reply_markup=reply_markup)
+            user_last_messages[user_id]['dorm_menu'] = message.message_id
+
+        elif text == "Информация о техникуме":
+            keyboard = [
+                [InlineKeyboardButton("Режим и график работы", callback_data="rezhim_rabot")],
+                [InlineKeyboardButton("Адрес техникума", callback_data="Adres_teh")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if 'college_menu' in user_last_messages[user_id]:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id,
+                                                     message_id=user_last_messages[user_id]['college_menu'])
+                except:
+                    pass
+
+            message = await update.message.reply_text("Выберите какая информация о техникуме вас интересует",
+                                                      reply_markup=reply_markup)
+            user_last_messages[user_id]['college_menu'] = message.message_id
+
+        elif text == "Связь с нами":
+            keyboard = [
+                [InlineKeyboardButton("Номер поддержки", callback_data="not")],
+                [InlineKeyboardButton("Электронная почта", callback_data="email")],
+                [InlineKeyboardButton("Связь с разработчиком", callback_data="developer")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if 'contact_menu' in user_last_messages[user_id]:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id,
+                                                     message_id=user_last_messages[user_id]['contact_menu'])
+                except:
+                    pass
+
+            message = await update.message.reply_text("Свяжитесь с нами:", reply_markup=reply_markup)
+            user_last_messages[user_id]['contact_menu'] = message.message_id
+
+        elif text == "Официальный канал и сайт":
+            keyboard = [
+                [InlineKeyboardButton("Официальный сайт", url="https://koopteh.ru")],
+                [InlineKeyboardButton("ВКонтакте", url="https://vk.ru/typical_ict")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if 'resources_menu' in user_last_messages[user_id]:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id,
+                                                     message_id=user_last_messages[user_id]['resources_menu'])
+                except:
+                    pass
+
+            message = await update.message.reply_text("Официальные ресурсы:", reply_markup=reply_markup)
+            user_last_messages[user_id]['resources_menu'] = message.message_id
+
+        elif text == "Помощь":
+            if 'help_message' in user_last_messages[user_id]:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id,
+                                                     message_id=user_last_messages[user_id]['help_message'])
+                except:
+                    pass
+
+            message = await update.message.reply_text(
+                "Используйте кнопки меню для навигации. Для перезапуска нажмите /start\n\nРазработчик: @ManyHere\nДля связи: many.here@vk.com")
+            user_last_messages[user_id]['help_message'] = message.message_id
+
+    except Exception as e:
+        await update.message.reply_text("Произошла ошибка. Попробуйте еще раз.")
+
+
+async def handle_inline_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+
+    await query.answer()
+
+    if user_id not in user_last_messages:
+        user_last_messages[user_id] = {}
+
+    data = query.data
+
+    try:
+        if data in user_last_messages[user_id]:
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=user_last_messages[user_id][data])
+            except:
+                pass
+
+        if data == "price":
+            response_text = "Студенты очного отделения ПОЧУ «Ижевский техникум экономики, управления и права Удмуртпотребсоюза» (при заселении в студенческие блоки) 5000,00 / месяц\n\nСтуденты очного отделения ПОЧУ «Ижевский техникум экономики, управления и права Удмуртпотребсоюза» при временном отсутствии на занимаемом койкоместе (при наличии подтверждающих документов) 50,00 / сутки"
+        elif data == "Adres":
+            response_text = "Удмуртская Республика, г. Ижевск, ул. Молодежная, д. 109"
+        elif data == "Max_mest":
+            response_text = "Количество мест в общежитии, выделяемых для иногородних поступающих - 352 места."
+        elif data == "Num_dorm":
+            response_text = "Номер телефона 37-11-33"
+        elif data == "rezhim_rabot":
+            response_text = "Понедельник: 8.30 - 17.00\nВторник: 8.30 - 17.00\nСреда: 8.30 - 17.00\nЧетверг: 8.30 - 17.00\nПятница: 8.30 - 17.00\nСуббота: 8.30 - 15.00\nВоскресенье: выходной"
+        elif data == "Adres_teh":
+            response_text = "Российская Федерация, Удмуртская Республика, 426073, город Ижевск, улица Молодежная, дом 109."
+        elif data == "not":
+            response_text = "Номер поддержки: +7 (3412) 37-02-88\nТелефон работает с 9:00 до 18:00"
+        elif data == "email":
+            response_text = "Электронная почта: ikoopteh@mail.ru"
+        elif data == "developer":
+            response_text = "Разработчик бота: @ManyHere\nEmail: many.here@vk.com\nGitHub: github.com/manyhere"
+        else:
+            response_text = "Извините эта функция добавится со временем"
+
+        message = await context.bot.send_message(chat_id=chat_id, text=response_text)
+        user_last_messages[user_id][data] = message.message_id
+
+    except Exception as e:
+        try:
+            await query.edit_message_text("Произошла ошибка. Попробуйте еще раз.")
+        except:
+            pass
+
+
+def main():
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(handle_inline_buttons))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
+    application.run_polling(drop_pending_updates=True)
+
+
+if __name__ == '__main__':
+    main()
